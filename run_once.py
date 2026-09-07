@@ -40,7 +40,9 @@ headers = {
 }
 
 # 發送請求時帶入 headers
+url = "https://..."  # 必須放在 requests.get 前面
 response = requests.get(url, headers=headers, timeout=10)
+
 
 
 # ========== 核心邏輯 ==========
