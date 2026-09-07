@@ -33,7 +33,14 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python run_once.py
+          TARGET=$(find . -name "run_once.py" -o -name "run_once.PY" | head -n 1)
+          if [ -z "$TARGET" ]; then
+            echo "找不到 run_once.py 檔案！"
+            exit 1
+          fi
+          cd $(dirname "$TARGET")
+          python $(basename "$TARGET")
+
 
 
       - name: Auto Commit updated seen_items.json
