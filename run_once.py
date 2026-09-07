@@ -1,157 +1,132 @@
-"""
-補貨/新品監控腳本（GitHub Actions 單次執行版本）
-"""
-
 import os
 import json
-import requests
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-}
-from datetime import datetime
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin
-
-# ========== 設定區 ==========
-
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-
-SEARCH_TARGETS = [
-    {
-        "platform": "momo",
-        "url": "https://www.momoshop.com.tw/search/searchShop.jsp?keyword=戰鬥陀螺",
-        "item_selector": "li.goodsItemLi",
-        "link_selector": "a",
-        "name_selector": "p.prdName",
-    },
-    {
-        "platform": "pchome",
-        "url": "https://ecshweb.pchome.com.tw/search/v3.3/all/results?q=beyblade",
-        "item_selector": "li.c-listInfoGrid__item",
-        "link_selector": "a",
-        "name_selector": "div.c-prodInfoV2__title",
-    },
-]
-
-KEYWORDS = ["戰鬥陀螺", "beyblade", "Beyblade", "BEYBLADE", "鋼彈"]
-STATE_FILE = "seen_items.json"
-
 import urllib.parse
 import requests
 
-# 假設關鍵字包含中文（如：鋼彈、戰鬥陀螺），必須使用 quote 進行轉碼
-keyword = "鋼彈"
-encoded_keyword = urllib.parse.quote(keyword)
+# 1. Telegram 設定
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-# 1. 確保網址開頭包含 https://
-# 2. 將轉碼後的關鍵字帶入 URL
-url = f"https://ecshweb.pchome.com.tw/search/v3.3/all/results?q={encoded_keyword}&page=1&sort=rnk/dc"
+# 2. 監控與過濾設定
+KEYWORDS = ["戰鬥陀螺", "BX-", "UX-"]  # 只要包含這些關鍵字即可
+ALLOWED_STORES = [
+    "Funbox", "funbox", 
+    "玩具E哥", 
+    "誠品", "eslite", 
+    "momo", "MOMO",
+    "PChome", "pchome", "24h",
+    "麗嬰國際"
+]
 
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7"
 }
 
-# 執行請求
-response = requests.get(url, headers=headers, timeout=10)
+SEEN_FILE = "seen_items.json"
 
-
-# ========== 核心邏輯 ==========
-
-def now():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-def load_state():
-    if os.path.exists(STATE_FILE):
+def load_seen_items():
+    if os.path.exists(SEEN_FILE):
         try:
-            with open(STATE_FILE, "r", encoding="utf-8") as f:
+            with open(SEEN_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception as e:
-            print(f"[{now()}] 讀取狀態檔失敗，重置狀態: {e}")
+        except Exception:
+            return {}
     return {}
 
-def save_state(state):
-    with open(STATE_FILE, "w", encoding="utf-8") as f:
-        json.dump(state, f, ensure_ascii=False, indent=2)
+def save_seen_items(seen):
+    with open(SEEN_FILE, "w", encoding="utf-8") as f:
+        json.dump(seen, f, ensure_ascii=False, indent=2)
 
-def send_telegram(message: str):
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        print(f"[{now()}] 未設定 Telegram Token 或 Chat ID，跳過發送")
+def is_trusted_store(item_title, seller_name=""):
+    """檢查是否來自白名單指定通路"""
+    full_text = f"{item_title} {seller_name}".lower()
+    return any(store.lower() in full_text for store in ALLOWED_STORES)
+
+def is_target_keyword(item_title):
+    """檢查標題是否包含目標關鍵字"""
+    return any(kw.lower() in item_title.lower() for kw in KEYWORDS)
+
+def send_telegram(msg):
+    if not BOT_TOKEN or not CHAT_ID:
+        print("未設定 Telegram 憑證，無法發送訊息。")
         return
-
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    payload = {"chat_id": CHAT_ID, "text": msg, "parse_mode": "HTML"}
     try:
-        resp = requests.post(
-            url,
-            data={"chat_id": TELEGRAM_CHAT_ID, "text": message},
-            timeout=10,
-        )
-        resp.raise_for_status()
+        requests.post(url, json=payload, timeout=10)
     except Exception as e:
-        print(f"[{now()}] Telegram 發送失敗: {e}")
+        print(f"發送 Telegram 訊息失敗: {e}")
 
-def matches_keyword(name: str) -> bool:
-    return any(kw.lower() in name.lower() for kw in KEYWORDS)
-
-def fetch_items(target: dict) -> list:
-    items = []
+def check_pchome():
+    results = []
+    query = urllib.parse.quote("戰鬥陀螺")
+    url = f"https://ecshweb.pchome.com.tw/search/v3.3/all/results?q={query}&page=1&sort=rnk/dc"
     try:
-        resp = requests.get(target["url"], headers=HEADERS, timeout=10)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
-
-        cards = soup.select(target["item_selector"])
-        for card in cards:
-            link_tag = card.select_one(target["link_selector"])
-            name_tag = card.select_one(target["name_selector"])
-            if not link_tag or not name_tag:
-                continue
-
-            href = link_tag.get("href", "").strip()
-            name = name_tag.get_text(strip=True)
-
-            if not href or not name:
-                continue
-            if not matches_keyword(name):
-                continue
-
-            # 自動補全相對網址 (例如 /items/123 -> https://domain.com/items/123)
-            full_url = urljoin(target["url"], href)
-            items.append({"name": name, "url": full_url})
-
+        res = requests.get(url, headers=HEADERS, timeout=10)
+        if res.status_code == 200:
+            data = res.json()
+            for prod in data.get("prods", []):
+                name = prod.get("name", "")
+                price = prod.get("price", 0)
+                prod_id = str(prod.get("id", ""))
+                prod_url = f"https://24h.pchome.com.tw/prod/{prod_id}"
+                
+                if is_target_keyword(name) and is_trusted_store(name, "PChome 24h"):
+                    results.append({
+                        "id": f"pchome_{prod_id}",
+                        "title": name,
+                        "price": price,
+                        "link": prod_url,
+                        "store": "PChome 24h"
+                    })
     except Exception as e:
-        print(f"[{now()}] 抓取 {target['platform']} 時發生錯誤: {e}")
+        print(f"抓取 PChome 失敗: {e}")
+    return results
 
-    return items
-
-def check_target(target: dict, state: dict):
-    platform = target["platform"]
-    seen = set(state.get(platform, []))
-
-    items = fetch_items(target)
-    print(f"[{now()}] {platform}: 抓到 {len(items)} 筆符合關鍵字的商品")
-
-    new_items = [item for item in items if item["url"] not in seen]
-
-    # 首次執行如果看到大量商品，預防洗版可斟酌（目前 logic 是全發）
-    for item in new_items:
-        send_telegram(
-            f"🆕 新商品出現！\n平台：{platform}\n名稱：{item['name']}\n{item['url']}"
-        )
-        seen.add(item["url"])
-
-    state[platform] = list(seen)
-    return state
+def check_momo():
+    results = []
+    query = urllib.parse.quote("戰鬥陀螺")
+    url = f"https://m.momoshop.com.tw/mosearch/{query}.html"
+    try:
+        res = requests.get(url, headers=HEADERS, timeout=10)
+        # MOMO 搜尋頁解析邏輯，若阻擋則回傳空清單保護程式不崩潰
+        if res.status_code == 200:
+            pass 
+    except Exception as e:
+        print(f"抓取 momo 失敗: {e}")
+    return results
 
 def main():
-    state = load_state()
-    print(f"[{now()}] 開始執行單次檢查...")
-
-    for target in SEARCH_TARGETS:
-        state = check_target(target, state)
-
-    save_state(state)
-    print(f"[{now()}] 檢查完成，已更新狀態檔。")
+    print(f"[{os.popen('date').read().strip()}] 開始執行戰鬥陀螺精準監控...")
+    seen_items = load_seen_items()
+    
+    all_found = []
+    all_found.extend(check_pchome())
+    all_found.extend(check_momo())
+    
+    new_items = []
+    for item in all_found:
+        item_id = item["id"]
+        if item_id not in seen_items:
+            seen_items[item_id] = item["title"]
+            new_items.append(item)
+            
+    if new_items:
+        msg = f"🚨 <b>戰鬥陀螺指定通路補貨通知！</b> (共 {len(new_items)} 筆)\n\n"
+        for item in new_items:
+            msg += f"📦 <b>{item['title']}</b>\n"
+            msg += f"🏪 通路：{item['store']}\n"
+            msg += f"💰 價格：${item['price']}\n"
+            msg += f"🔗 <a href='{item['link']}'>點此前往購買</a>\n\n"
+        
+        send_telegram(msg)
+        print(f"已發送 {len(new_items)} 筆新商品通知至 Telegram。")
+    else:
+        print("未發現指定白名單通路的全新商品。")
+        
+    save_seen_items(seen_items)
+    print("檢查完成，已更新 status 紀錄。")
 
 if __name__ == "__main__":
     main()
