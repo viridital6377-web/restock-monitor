@@ -69,9 +69,15 @@ def check_pchome():
             for prod in data.get("prods", []):
                 name = prod.get("name", "")
                 price = prod.get("price", 0)
-                prod_id = str(prod.get("id", ""))
-                # 改用手機版直達連結，避免轉址白畫面
-                prod_url = f"https://24h.m.pchome.com.tw/prod/{prod_id}"
+                
+                # 確保正確取得 Id 欄位（PChome API key 通常是 Id 或 IdStr）
+                prod_id = str(prod.get("Id", prod.get("id", "")))
+                
+                # 只有拿到 ID 時才拼接完整網址（標準 24h 網址）
+                if prod_id:
+                    prod_url = f"https://24h.pchome.com.tw/prod/{prod_id}"
+                else:
+                    continue
                 
                 if is_target_keyword(name) and is_trusted_store(name, "PChome 24h"):
                     results.append({
