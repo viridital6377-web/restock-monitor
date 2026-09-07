@@ -21,19 +21,23 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+      - name: Find and Install dependencies
+        run: |
+          REQ_FILE=$(find . -name "requirements.txt" | head -n 1)
+          pip install -r "$REQ_FILE"
 
       - name: Run monitor once
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python run_once.py
+        run: |
+          PY_FILE=$(find . -name "run_once.py" | head -n 1)
+          cd $(dirname "$PY_FILE")
+          python $(basename "$PY_FILE")
 
       - name: Auto Commit updated seen_items.json
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "chore: update seen_items.json [skip ci]"
-          file_pattern: "seen_items.json"
+          file_pattern: "**/seen_items.json"
