@@ -31,7 +31,7 @@ SEARCH_TARGETS = [
     },
 ]
 
-KEYWORDS = ["戰鬥陀螺", "beyblade", "Beyblade", "BEYBLADE"]
+KEYWORDS = ["戰鬥陀螺", "beyblade", "Beyblade", "BEYBLADE", "鋼彈"]
 STATE_FILE = "seen_items.json"
 
 HEADERS = {
