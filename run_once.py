@@ -19,7 +19,7 @@ ALLOWED_STORES = [
 ]
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
     "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7"
 }
 
@@ -70,7 +70,8 @@ def check_pchome():
                 name = prod.get("name", "")
                 price = prod.get("price", 0)
                 prod_id = str(prod.get("id", ""))
-                prod_url = f"https://24h.pchome.com.tw/prod/{prod_id}"
+                # 改用手機版直達連結，避免轉址白畫面
+                prod_url = f"https://m.pchome.com.tw/prod/{prod_id}"
                 
                 if is_target_keyword(name) and is_trusted_store(name, "PChome 24h"):
                     results.append({
