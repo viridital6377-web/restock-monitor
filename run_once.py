@@ -91,15 +91,45 @@ def check_pchome():
         print(f"抓取 PChome 失敗: {e}")
     return results
 
+from bs4 import BeautifulSoup
+
 def check_momo():
     results = []
     query = urllib.parse.quote("戰鬥陀螺")
     url = f"https://m.momoshop.com.tw/mosearch/{query}.html"
     try:
         res = requests.get(url, headers=HEADERS, timeout=10)
-        # MOMO 搜尋頁解析邏輯，若阻擋則回傳空清單保護程式不崩潰
         if res.status_code == 200:
-            pass 
+            soup = BeautifulSoup(res.text, "html.parser")
+            # 抓取 momo 手機版搜尋結果的商品列表項目
+            items = soup.select("li.goodsItemLi")
+            for item in items:
+                title_elem = item.select_one(".prdName")
+                price_elem = item.select_one(".price")
+                link_elem = item.select_one("a")
+                
+                if title_elem and link_elem:
+                    title = title_elem.get_text(strip=True)
+                    price = price_elem.get_text(strip=True).replace("$", "").replace(",", "") if price_elem else "0"
+                    
+                    # 抓取商品代碼 (goodsCode)
+                    href = link_elem.get("href", "")
+                    goods_code = ""
+                    if "i_code=" in href:
+                        goods_code = href.split("i_code=")[1].split("&")[0]
+                    
+                    if goods_code:
+                        # 拼接手機直達專用連結
+                        momo_url = f"https://m.momoshop.com.tw/goods.momo?i_code={goods_code}"
+                        
+                        if is_target_keyword(title) and is_trusted_store(title, "momo"):
+                            results.append({
+                                "id": f"momo_{goods_code}",
+                                "title": title,
+                                "price": int(price) if price.isdigit() else price,
+                                "link": momo_url,
+                                "store": "momo 購物網"
+                            })
     except Exception as e:
         print(f"抓取 momo 失敗: {e}")
     return results
