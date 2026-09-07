@@ -34,15 +34,23 @@ SEARCH_TARGETS = [
 KEYWORDS = ["戰鬥陀螺", "beyblade", "Beyblade", "BEYBLADE", "鋼彈"]
 STATE_FILE = "seen_items.json"
 
+import urllib.parse
+import requests
+
+# 假設關鍵字包含中文（如：鋼彈、戰鬥陀螺），必須使用 quote 進行轉碼
+keyword = "鋼彈"
+encoded_keyword = urllib.parse.quote(keyword)
+
+# 1. 確保網址開頭包含 https://
+# 2. 將轉碼後的關鍵字帶入 URL
+url = f"https://ecshweb.pchome.com.tw/search/v3.3/all/results?q={encoded_keyword}&page=1&sort=rnk/dc"
+
 headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
 
-# 發送請求時帶入 headers
-url = "https://..."  # 必須放在 requests.get 前面
+# 執行請求
 response = requests.get(url, headers=headers, timeout=10)
-
 
 
 # ========== 核心邏輯 ==========
