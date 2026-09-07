@@ -1,0 +1,40 @@
+name: Restock Monitor
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # 每 10 分鐘觸發一次
+  workflow_dispatch:          # 允許在 GitHub 頁面上手動點擊觸發測試
+
+# 必須賦予權限，讓 Actions 可以 commit 並 push 檔案回 Repo
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5        # 避免程式卡住消耗配額，設定 5 分鐘逾時
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"         # 加快套件安裝速度
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run monitor once
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python run_once.py
+
+      - name: Auto Commit updated seen_items.json
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: update seen_items.json [skip ci]"
+          file_pattern: "seen_items.json"
