@@ -27,14 +27,14 @@ jobs:
           REQ_FILE=$(find . -name "requirements.txt" | head -n 1)
           pip install -r "$REQ_FILE"
 
+    
       - name: Run monitor once
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          PY_FILE=$(find . -name "run_once.py" | head -n 1)
-          cd $(dirname "$PY_FILE")
-          python $(basename "$PY_FILE")
+          python run_once.py
+
 
       - name: Auto Commit updated seen_items.json
         uses: stefanzweifel/git-auto-commit-action@v5
