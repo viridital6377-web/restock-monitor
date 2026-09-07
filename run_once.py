@@ -71,7 +71,7 @@ def check_pchome():
                 price = prod.get("price", 0)
                 prod_id = str(prod.get("id", ""))
                 # 改用手機版直達連結，避免轉址白畫面
-                prod_url = f"https://m.pchome.com.tw/prod/{prod_id}"
+                prod_url = f"https://24h.m.pchome.com.tw/prod/{prod_id}"
                 
                 if is_target_keyword(name) and is_trusted_store(name, "PChome 24h"):
                     results.append({
