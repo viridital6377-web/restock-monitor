@@ -17,13 +17,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Debug - List Files
-        run: |
-          echo "=== 當前工作目錄 ==="
-          pwd
-          echo "=== 檔案清單 ==="
-          ls -la
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -37,7 +30,7 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python run_once.py
+        run: python $(find . -name "run_once.py" | head -n 1)
 
       - name: Auto Commit updated seen_items.json
         uses: stefanzweifel/git-auto-commit-action@v5
